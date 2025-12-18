@@ -1,70 +1,70 @@
-# Getting Started with Create React App
+# 🚌 نظام التنبؤ بتأخير المواصلات العامة (Public Transportation Delay Predictor)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+هذا المشروع عبارة عن تطبيق ويب متكامل يعتمد على الذكاء الاصطناعي لتحليل وتوقع تأخيرات الحافلات باستخدام بيانات واقعية "غير نظيفة" (Dirty Data). يغطي المشروع دورة حياة علم البيانات كاملة من تنظيف البيانات إلى بناء النماذج والتنبؤ.
 
-## Available Scripts
+## 🌟 مميزات المشروع والمراحل
 
-In the project directory, you can run:
+يقوم التطبيق بتنفيذ المراحل التالية بشكل تلقائي وتفاعلي:
 
-### `npm start`
+### 1. رفع البيانات وتقييم جودتها (Data Loading & Quality Check)
+*   **استقبال البيانات**: يمكن للمستخدم رفع ملف `csv` يحتوي على بيانات الرحلات (مثل: رقم المسار، الوقت المحدد، الوقت الفعلي، الطقس، عدد الركاب).
+*   **كشف الأخطاء**: يقوم النظام فوراً بتحليل البيانات وكشف المشاكل (مثل: القيم المفقودة، تنسيقات الوقت الخاطئة، إحداثيات GPS غير المنطقية).
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### 2. تنظيف البيانات والمعالجة الأولية (Data Cleaning & Preprocessing)
+هذه المرحلة هي "قلب" المشروع، حيث يتم تحويل البيانات "القذرة" إلى بيانات نظيفة جاهزة للتحليل:
+*   **توحيد تنسيق الوقت**: يتم تحويل جميع الأوقات (سواء كانت `12:30` أو `1230` أو `12.30PM`) إلى تنسيق قياسي موحد `YYYY-MM-DD HH:mm:ss`.
+*   **معالجة القيم المفقودة (Imputation)**:
+    *   **وقت الوصول الفعلي**: في حالة عدم وجود وقت وصول، لا يتم افتراض 0 تأخير، بل يتم تعويض القيمة بتأخير عشوائي مدروس (Weighted Random Imputation) لمحاكاة الواقع.
+    *   **عدد الركاب**: يتم تعويض القيم المفقودة باستخدام الوسيط (Median).
+*   **توحيد معرفات المسارات (Route IDs)**: يتم تنظيف أسماء المسارات (مثل `Route 1`, `R-01`, `01`) لتصبح جميعها بتنسيق موحد (مثل `R1`).
+*   **معالجة القيم الشاذة (Outliers)**: يتم استخدام طرق إحصائية (IQR أو Z-Score) لتحديد وتصحيح القيم المتطرفة في أعداد الركاب.
+*   **حساب التأخير**: يتم حساب الفرق بين الوقت الفعلي والمحدد، مع ضمان عدم وجود قيم سالبة (أي وصول مبكر يعتبر تأخير 0 دقيقة).
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 3. هندسة الخصائص (Feature Engineering)
+يتم استخراج معلومات مفيدة من البيانات الخام لتحسين دقة النماذج:
+*   **حالة الوقت**: (صباح، ظهيرة، مساء).
+*   **نوع اليوم**: (يوم عمل، عطلة نهاية أسبوع).
+*   **شدة الطقس**: تحويل حالة الطقس إلى قيمة رقمية (مشمس=1، ممطر=3، إلخ).
+*   **وقت الذروة**: تحديد ما إذا كانت الرحلة في ساعة ذروة أم لا.
 
-### `npm test`
+### 4. تحليل البيانات الاستكشافي (EDA)
+*   عرض رسوم بيانية تفاعلية توضح توزيع التأخيرات.
+*   تحليل العلاقة بين الطقس والتأخير.
+*   مقارنة التأخيرات حسب أوقات الذروة وأرقام المسارات.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 5. النمذجة والذكاء الاصطناعي (AI Modeling)
+يقوم النظام بتدريب ثلاثة نماذج تعلم آلي مختلفة ومقارنتها:
+1.  **الانحدار الخطي (Linear Regression)**: نموذج أساسي لفهم العلاقات البسيطة.
+2.  **الغابة العشوائية (Random Forest)**: نموذج قوي للتعامل مع البيانات المعقدة.
+3.  **XGBoost**: نموذج متقدم عالي الأداء (غالباً ما يكون الأفضل).
 
-### `npm run build`
+يتم تقييم النماذج باستخدام مقاييس دقيقة (MAE, RMSE, R² Score) وعرض النتائج.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 6. نظام التنبؤ التفاعلي (Live Prediction System)
+*   يتيح هذا القسم للمستخدم إدخال بيانات رحلة جديدة (المسار، الوقت، الطقس).
+*   يقوم النظام فوراً بتقديم **تنبؤ بالمدة المتوقعة للتأخير**.
+*   يقدم النظام **شرحاً للأسباب** (Explainability) يوضح لماذا تم التنبؤ بهذا التأخير (مثلاً: "بسبب المطر الشديد" أو "بسبب وقت الذروة").
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## 🛠️ التقنيات المستخدمة
+*   **Frontend**: React.js (واجهة مستخدم تفاعلية وسريعة).
+*   **Data Processing**: JavaScript (تنظيف وتحليل البيانات ومعالجة المصفوفات).
+*   **Styling**: Tailwind CSS (تصميم عصري ومتجاوب).
+*   **Visualization**: Recharts (رسوم بيانية تفاعلية).
 
-### `npm run eject`
+## 🚀 كيفية التشغيل
+1.  تأكد من تثبيت Node.js.
+2.  افتح المجلد في موجه الأوامر (Terminal).
+3.  قم بتثبيت المكتبات:
+    ```bash
+    npm install
+    ```
+4.  قم بتشغيل المشروع:
+    ```bash
+    npm start
+    ```
+5.  سيفتح التطبيق تلقائياً في المتصفح.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+---
+© 2025 AI Project Team
