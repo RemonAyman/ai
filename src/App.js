@@ -331,6 +331,13 @@ const TransportDelayPredictor = () => {
         median = mean;
       }
 
+      // Calculate mean Lat/Lon for imputation of missing values (Columns F & G)
+      const validLats = dataset.map(d => parseFloat(d.latitude)).filter(n => !isNaN(n) && n > -90 && n < 90 && n !== 999);
+      const validLons = dataset.map(d => parseFloat(d.longitude)).filter(n => !isNaN(n) && n > -180 && n < 180 && n !== 999);
+      
+      const meanLat = validLats.length > 0 ? validLats.reduce((a, b) => a + b, 0) / validLats.length : 30.0;
+      const meanLon = validLons.length > 0 ? validLons.reduce((a, b) => a + b, 0) / validLons.length : 31.0;
+
       const cleaned = dataset.map((record) => {
         // Stronger Route ID Normalization
         // Goal: "R1", "Route 1", "01", "R01" -> ALL become "R1"
@@ -372,8 +379,9 @@ const TransportDelayPredictor = () => {
         let lat = parseFloat(record.latitude);
         let lon = parseFloat(record.longitude);
         
-        if (isNaN(lat) || lat > 90 || lat < -90 || lat === 999) lat = null;
-        if (isNaN(lon) || lon > 180 || lon < -180 || lon === 999) lon = null;
+        // Impute missing/invalid GPS with Mean (Average)
+        if (isNaN(lat) || lat > 90 || lat < -90 || lat === 999) lat = meanLat;
+        if (isNaN(lon) || lon > 180 || lon < -180 || lon === 999) lon = meanLon;
 
         const scheduledTime = cleanTime(record.scheduled_time);
         let actualTime = cleanTime(record.actual_time);
