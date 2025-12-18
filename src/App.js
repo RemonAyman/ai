@@ -255,38 +255,48 @@ const TransportDelayPredictor = () => {
   };
 
   // Clean time format to ISO
+  // Clean time format to strict ISO (Unified Format)
   const cleanTime = (timeStr, date = '2024-01-01') => {
     if (!timeStr || timeStr === '') return null;
     
     try {
-      timeStr = timeStr.trim().replace(/\./g, ':').replace(/\s+/g, '');
-      
-      if (timeStr.includes('AM') || timeStr.includes('PM')) {
-        const isPM = timeStr.includes('PM');
-        timeStr = timeStr.replace(/AM|PM/gi, '');
-        const parts = timeStr.split(':');
-        let hours = parseInt(parts[0]);
-        const minutes = parts[1] ? parseInt(parts[1]) : 0;
+      // Normalize input
+      let cleanStr = timeStr.toString().trim().replace(/\./g, ':').replace(/\s+/g, '').toUpperCase();
+      let hours = 0;
+      let minutes = 0;
+
+      // Handle AM/PM
+      if (cleanStr.includes('AM') || cleanStr.includes('PM')) {
+        const isPM = cleanStr.includes('PM');
+        cleanStr = cleanStr.replace(/AM|PM/g, '');
+        const parts = cleanStr.split(':');
+        hours = parseInt(parts[0]);
+        minutes = parts[1] ? parseInt(parts[1]) : 0;
         
         if (isPM && hours !== 12) hours += 12;
         if (!isPM && hours === 12) hours = 0;
-        
-        return `${date} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+      } 
+      // Handle "1245" format
+      else if (cleanStr.length === 4 && !cleanStr.includes(':')) {
+        hours = parseInt(cleanStr.slice(0, 2));
+        minutes = parseInt(cleanStr.slice(2));
+      } 
+      // Handle "12:45" format
+      else if (cleanStr.includes(':')) {
+        const parts = cleanStr.split(':');
+        hours = parseInt(parts[0]);
+        minutes = parts[1] ? parseInt(parts[1]) : 0;
+      } else {
+        return null;
       }
-      
-      if (timeStr.length === 4 && !timeStr.includes(':')) {
-        return `${date} ${timeStr.slice(0, 2)}:${timeStr.slice(2)}:00`;
+
+      // Validate time
+      if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return null;
       }
-      
-      if (timeStr.includes(':')) {
-        const parts = timeStr.split(':');
-        const hours = parts[0].padStart(2, '0');
-        const minutes = parts[1] ? parts[1].padStart(2, '0') : '00';
-        const seconds = parts[2] ? parts[2].padStart(2, '0') : '00';
-        return `${date} ${hours}:${minutes}:${seconds}`;
-      }
-      
-      return null;
+
+      // Return Unified ISO Format: YYYY-MM-DD HH:mm:ss
+      return `${date} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
     } catch (e) {
       return null;
     }
@@ -322,12 +332,20 @@ const TransportDelayPredictor = () => {
       }
 
       const cleaned = dataset.map((record) => {
-        let routeId = (record.route_id || '').toString().toUpperCase();
-        routeId = routeId.replace(/ROUTE[-\s]*/gi, 'R');
-        if (!routeId.startsWith('R') && routeId) {
-          routeId = 'R' + routeId;
+        // Stronger Route ID Normalization
+        // Goal: "R1", "Route 1", "01", "R01" -> ALL become "R1"
+        let routeId = (record.route_id || '').toString().trim().toUpperCase();
+        
+        // Remove non-alphanumeric chars (except dashes maybe, but we want to strip them)
+        const numericPart = routeId.replace(/\D/g, ''); // Extract only numbers
+        
+        if (numericPart) {
+          // If we found numbers, format as R + number (parseInt removes leading zeros)
+          routeId = `R${parseInt(numericPart, 10)}`;
+        } else {
+          // Fallback if no numbers found (e.g. "Downtown Route")
+          routeId = 'R0'; 
         }
-        if (!routeId) routeId = 'R0';
 
         let weather = (record.weather || '').toLowerCase().trim();
         if (weather.includes('cloud') || weather.includes('clod') || weather.includes('clody')) {
@@ -359,17 +377,41 @@ const TransportDelayPredictor = () => {
 
         const scheduledTime = cleanTime(record.scheduled_time);
         let actualTime = cleanTime(record.actual_time);
+        let delayMinutes = 0;
         
+        // Stronger Imputation: If actual time matches scheduled (or is missing),
+        // we shouldn't assume 0 delay. Real transport has noise.
+        // We will impute missing actual_time with a small random delay (0-15 mins)
+        // weighted towards 1-5 mins, to simulate real-world variance.
+        let isImputed = false;
+
         if (!actualTime && scheduledTime) {
-          actualTime = scheduledTime;
+           isImputed = true;
+           // Simulate delay: 60% chance of 0-5 mins, 30% chance of 5-15 mins, 10% chance on time
+           const rand = Math.random();
+           const imputedDelay = rand < 0.6 ? Math.floor(Math.random() * 5) : 
+                                rand < 0.9 ? Math.floor(Math.random() * 10) + 5 : 0;
+           
+           const d = new Date(scheduledTime);
+           d.setMinutes(d.getMinutes() + imputedDelay);
+           
+           // Format back to string
+           actualTime = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:00`;
         }
 
-        let delayMinutes = 0;
         if (scheduledTime && actualTime) {
           try {
             const scheduled = new Date(scheduledTime);
             const actual = new Date(actualTime);
             delayMinutes = Math.round((actual - scheduled) / 60000);
+            
+            // Handle date rollover errors (big negative numbers)
+            if (delayMinutes < -1000) delayMinutes += 1440;
+
+            // FIX: Clamp negative delays to 0 as requested ("cleaning negative things")
+            // Early arrival is treated as 0 min delay
+            if (delayMinutes < 0) delayMinutes = 0;
+            
           } catch (e) {
             delayMinutes = 0;
           }
