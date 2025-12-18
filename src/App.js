@@ -1076,7 +1076,7 @@ Best Model: XGBoost (R² = 0.81)
 
               <div className="mt-8 text-left bg-gray-50 p-6 rounded-lg max-w-3xl mx-auto">
                 <h3 className="font-bold mb-3 text-lg">📋 Expected CSV Format:</h3>
-                <code className="text-sm text-gray-700 block bg-white p-3 rounded mb-4">
+                <code className="text-sm text-gray-700 block bg-white p-3 rounded mb-4 overflow-x-auto whitespace-nowrap">
                   route_id,scheduled_time,actual_time,weather,passenger_count,latitude,longitude
                 </code>
                 
@@ -1202,7 +1202,7 @@ Best Model: XGBoost (R² = 0.81)
                 {outlierStats && outlierMethod === 'zscore' && (
                   <div>
                     <h4 className="font-bold mb-3">📈 Z-Score Outlier Detection (Passenger Count)</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mb-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-sm mb-3">
                       <div>
                         <div className="text-gray-600">Mean (μ)</div>
                         <div className="font-bold">{outlierStats.zscore.mean}</div>
@@ -1424,7 +1424,7 @@ Best Model: XGBoost (R² = 0.81)
                   📊 Data Visualizations
                 </h3>
                 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white p-4 rounded-lg shadow">
                     <h4 className="font-semibold mb-3 text-center">Delay Distribution (minutes)</h4>
                     <canvas ref={delayChartRef} width="400" height="250" className="w-full"></canvas>
@@ -1575,7 +1575,7 @@ Best Model: XGBoost (R² = 0.81)
                 </button>
               </div>
               
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border-2 border-blue-200">
                   <h3 className="font-bold text-lg mb-4">Linear Regression</h3>
                   <div className="space-y-2 text-sm">
