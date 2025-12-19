@@ -329,7 +329,7 @@ const ChatInterface = ({ user, onLogout }) => {
       `💡 الأسباب:\n${reasons.map(r => `  • ${r.factor}: ${r.impact}`).join('\n')}\n\n` +
       `عايز تفحص طريق تاني؟`;
     
-    addMessage(responseText, 'bot', ['🔄 طريق جديد', ...ROUTES.slice(0, 3)]);
+    addMessage(responseText, 'bot', ['🔄 طريق جديد']);
     setStep('DONE');
   };
 
