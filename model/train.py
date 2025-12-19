@@ -33,8 +33,19 @@ def train_model():
 
     # 3. Time Features
     # Ensure hour_of_day exists, otherwise create it
-    if "hour_of_day" not in df.columns:
-        df["hour_of_day"] = pd.to_datetime(df["scheduled_time"]).dt.hour
+    # 3. Time Features
+    # Ensure hour_of_day exists, otherwise create it
+    try:
+        # parsed with errors='coerce' turns unparseable data into NaT
+        df["scheduled_time"] = pd.to_datetime(df["scheduled_time"], errors="coerce")
+        if "hour_of_day" not in df.columns:
+            df["hour_of_day"] = df["scheduled_time"].dt.hour
+    except Exception as e:
+        print(f"Error parsing dates: {e}")
+        return
+
+    # Drop rows where time could not be parsed
+    df = df.dropna(subset=["hour_of_day"])
 
     # 4. Peak Hour
     if "is_peak_hour" not in df.columns:
@@ -47,12 +58,14 @@ def train_model():
     feature_cols = ["hour_of_day", "is_peak_hour", "weather_code", "route_code"]
     target_col = "delay_minutes"
 
+    # Ensure all features exist and drop any remaining NaNs (better than filling with 0)
+    df = df.dropna(subset=feature_cols + [target_col])
+
     X = df[feature_cols]
     y = df[target_col]
 
-    # Handle NaN
-    X = X.fillna(0)
-    y = y.fillna(0)
+    # Handle NaN - we already dropped them, but just in case
+    # X = X.fillna(0)  <-- Removing this generic zero-fill which caused issues
 
     print(f"Training on {len(df)} records with features: {feature_cols}")
 
@@ -63,16 +76,19 @@ def train_model():
     # Try XGBoost first for better performance; fall back to RandomForest if not available
     try:
         import xgboost as xgb
+
         print("Training XGBoost Regressor...")
         model = xgb.XGBRegressor(n_estimators=200, random_state=42, verbosity=0)
         model.fit(X_train, y_train)
-        model_name = 'xgboost'
+        model_name = "xgboost"
     except Exception as e:
-        print("XGBoost not available or failed, falling back to RandomForest. Error:", e)
+        print(
+            "XGBoost not available or failed, falling back to RandomForest. Error:", e
+        )
         print("Training Random Forest Regressor...")
         model = RandomForestRegressor(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
-        model_name = 'random_forest'
+        model_name = "random_forest"
 
     preds = model.predict(X_test)
     mae = mean_absolute_error(y_test, preds)
@@ -85,7 +101,10 @@ def train_model():
 
     joblib.dump(model, "model/artifacts/model.pkl")
     # Save a small metadata file
-    joblib.dump({'model_name': model_name, 'feature_cols': feature_cols}, "model/artifacts/metadata.pkl")
+    joblib.dump(
+        {"model_name": model_name, "feature_cols": feature_cols},
+        "model/artifacts/metadata.pkl",
+    )
     # Save encoders to map inputs correctly during prediction
     joblib.dump(le_route, "model/artifacts/le_route.pkl")
     joblib.dump(le_weather, "model/artifacts/le_weather.pkl")

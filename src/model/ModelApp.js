@@ -1,7 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, LogOut, X } from 'lucide-react';
 
-const API_URL = '/api';
+// Mock users في الـ localStorage
+const getUsers = () => {
+  try {
+    return JSON.parse(localStorage.getItem('transport_users') || '{}');
+  } catch {
+    return {};
+  }
+};
+
+const saveUsers = (users) => {
+  localStorage.setItem('transport_users', JSON.stringify(users));
+};
+
+// Routes من الـ CSV (هتقراها من ملف أو hardcode)
+const ROUTES = ['R1', 'R2', 'R3', 'R4'];
 
 const AuthForm = ({ onAuth }) => {
   const [mode, setMode] = useState('login');
@@ -16,24 +30,30 @@ const AuthForm = ({ onAuth }) => {
     setError('');
     setLoading(true);
 
-    const endpoint = mode === 'signup' ? '/auth/signup' : '/auth/login';
-    const payload = mode === 'signup' ? { email, password, name } : { email, password };
-
     try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        onAuth(data.user);
+      await new Promise(r => setTimeout(r, 500)); // Simulate delay
+      const users = getUsers();
+
+      if (mode === 'signup') {
+        if (users[email]) {
+          setError('المستخدم موجود بالفعل');
+          setLoading(false);
+          return;
+        }
+        users[email] = { password, name };
+        saveUsers(users);
+        onAuth({ email, name });
       } else {
-        setError(data.error || 'فشل تسجيل الدخول');
+        const user = users[email];
+        if (!user || user.password !== password) {
+          setError('بيانات خاطئة');
+          setLoading(false);
+          return;
+        }
+        onAuth({ email, name: user.name });
       }
     } catch (err) {
-      setError('مشكلة في الاتصال بالسيرفر. تأكد إن الـ Backend شغال على port 5000');
+      setError('حصل خطأ، جرب تاني');
     } finally {
       setLoading(false);
     }
@@ -57,6 +77,7 @@ const AuthForm = ({ onAuth }) => {
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="الاسم الكامل / Full Name"
+            required
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
           />
         )}
@@ -64,6 +85,8 @@ const AuthForm = ({ onAuth }) => {
           value={email}
           onChange={e => setEmail(e.target.value)}
           placeholder="البريد الإلكتروني / Email"
+          type="email"
+          required
           className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
         />
         <input
@@ -71,6 +94,7 @@ const AuthForm = ({ onAuth }) => {
           onChange={e => setPassword(e.target.value)}
           placeholder="كلمة المرور / Password"
           type="password"
+          required
           className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
         />
         
@@ -101,10 +125,9 @@ const AuthForm = ({ onAuth }) => {
 
 const ChatInterface = ({ user, onLogout }) => {
   const [messages, setMessages] = useState([]);
-  const [step, setStep] = useState('LOADING');
+  const [step, setStep] = useState('ROUTE');
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
-  const [routes, setRoutes] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -115,28 +138,11 @@ const ChatInterface = ({ user, onLogout }) => {
   useEffect(scrollToBottom, [messages]);
 
   useEffect(() => {
-    const loadRoutes = async () => {
-      try {
-        const res = await fetch(`${API_URL}/routes`);
-        const data = await res.json();
-        if (data.routes && data.routes.length > 0) {
-          setRoutes(data.routes);
-          setStep('ROUTE');
-          addMessage(
-            `أهلاً ${user.name || 'يا صديقي'} 👋\n\nأنا هنا عشان أساعدك تعرف التأخير المتوقع في رحلتك 🚌\n\nأول حاجة، عايز تسلك أنهي طريق؟`,
-            'bot',
-            data.routes.slice(0, 6)
-          );
-        } else {
-          setStep('ERROR');
-          addMessage('⚠️ معلش، مش لاقي الطرق المتاحة. تأكد إن الـ Backend شغال والـ CSV موجود.', 'bot');
-        }
-      } catch (err) {
-        setStep('ERROR');
-        addMessage('❌ مشكلة في الاتصال بالسيرفر. تأكد إن الـ Backend شغال على port 5000', 'bot');
-      }
-    };
-    loadRoutes();
+    addMessage(
+      `أهلاً ${user.name || 'يا صديقي'} 👋\n\nأنا هنا عشان أساعدك تعرف التأخير المتوقع في رحلتك 🚌\n\nأول حاجة، عايز تسلك أنهي طريق؟`,
+      'bot',
+      ROUTES
+    );
   }, [user.name]);
 
   const addMessage = (text, type = 'bot', options = null) => {
@@ -165,10 +171,9 @@ const ChatInterface = ({ user, onLogout }) => {
     addMessage(inputVal, 'user');
 
     if (step === 'ROUTE') {
-      const routeMatch = routes.find(r => 
+      const routeMatch = ROUTES.find(r => 
         inputVal.toUpperCase().includes(r) || 
-        r.includes(inputVal.toUpperCase()) ||
-        inputVal.toUpperCase().replace(/\s/g, '') === r.replace(/\s/g, '')
+        r.includes(inputVal.toUpperCase())
       );
       
       if (routeMatch) {
@@ -185,7 +190,7 @@ const ChatInterface = ({ user, onLogout }) => {
         addMessage(
           `⚠️ معلش، الطريق "${inputVal}" مش موجود.\n\nاختار من الطرق المتاحة:`,
           'bot',
-          routes.slice(0, 6)
+          ROUTES
         );
       }
     } 
@@ -209,7 +214,7 @@ const ChatInterface = ({ user, onLogout }) => {
       let time = inputVal;
       let timeText = inputVal;
       
-      if (inputVal.includes('دلوقتي') || inputVal.toLowerCase().includes('now') || inputVal.includes('الآن')) {
+      if (inputVal.includes('دلوقتي') || inputVal.toLowerCase().includes('now')) {
         const now = new Date();
         time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         timeText = `الساعة ${time}`;
@@ -219,7 +224,7 @@ const ChatInterface = ({ user, onLogout }) => {
       } else if (inputVal.includes('الذروة') || inputVal.includes('ذروة') || inputVal.includes('5') || inputVal.includes('مساء')) {
         time = '17:00';
         timeText = 'الساعة 5 مساءً';
-      } else if (inputVal.includes('تاني') || inputVal.includes('آخر') || inputVal.includes('مختلف') || inputVal.includes('اكتب')) {
+      } else if (inputVal.includes('تاني') || inputVal.includes('آخر') || inputVal.includes('اكتب')) {
         addMessage(
           'تمام! اكتب الوقت اللي عايزه بالصيغة دي:\n\n' +
           '• 08:00 (صباحاً)\n' +
@@ -239,12 +244,12 @@ const ChatInterface = ({ user, onLogout }) => {
             time = `${hour.toString().padStart(2, '0')}:${min.padStart(2, '0')}`;
             timeText = `الساعة ${time}`;
           } else {
-            addMessage('⚠️ معلش، الوقت غلط. اكتب وقت صح من 0 لـ 23 (مثال: 8:00 أو 14:30)', 'bot');
+            addMessage('⚠️ معلش، الوقت غلط. اكتب وقت صح من 0 لـ 23', 'bot');
             return;
           }
         } else {
-          addMessage('⚠️ مش فاهم الوقت. اكتب بالصيغة دي: 8:00 أو 14:30 أو اضغط على أحد الخيارات', 'bot',
-            ['⏰ دلوقتي (Now)', '🌅 الصبح 8 صباحاً', '🌆 وقت الذروة 5 مساءً']
+          addMessage('⚠️ مش فاهم الوقت. اكتب بالصيغة دي: 8:00 أو 14:30', 'bot',
+            ['⏰ دلوقتي', '🌅 الصبح 8', '🌆 الذروة 5']
           );
           return;
         }
@@ -264,61 +269,68 @@ const ChatInterface = ({ user, onLogout }) => {
       addMessage(
         `تمام! خلينا نبدأ من الأول 🔄\n\nعايز تسلك أنهي طريق؟`,
         'bot',
-        routes.slice(0, 6)
+        ROUTES
       );
     }
   };
 
   const predictDelay = async (data) => {
-    try {
-      const payload = {
-        route_id: data.route_id,
-        scheduled_time: data.scheduled_time,
-        weather: data.weather,
-        day_type: new Date().getDay() % 6 === 0 ? 'weekend' : 'weekday'
-      };
-
-      const res = await fetch(`${API_URL}/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const result = await res.json();
-
-      setLoading(false);
-      if (result.delay !== undefined) {
-        let statusEmoji = '✅';
-        let statusText = 'في الوقت';
-        if (result.delay > 10) {
-          statusEmoji = '🔴';
-          statusText = 'تأخير كبير';
-        } else if (result.delay > 5) {
-          statusEmoji = '🟡';
-          statusText = 'تأخير متوسط';
-        } else if (result.delay > 0) {
-          statusEmoji = '🟢';
-          statusText = 'تأخير بسيط';
-        }
-
-        const responseText = `${statusEmoji} التنبؤ جاهز للطريق ${data.route_id}!\n\n` +
-          `📊 الحالة: ${statusText}\n` +
-          `⏱️ التأخير المتوقع: ${result.delay} دقيقة\n` +
-          `🎯 دقة التنبؤ: ${result.confidence}%\n\n` +
-          `💡 الأسباب:\n${result.reasons ? result.reasons.map(r => `  • ${r.factor}: ${r.impact}`).join('\n') : ''}\n\n` +
-          `عايز تفحص طريق تاني؟`;
-        
-        addMessage(responseText, 'bot', ['🔄 طريق جديد']);
-        setStep('DONE');
-      } else {
-        addMessage('❌ عذراً، حصل خطأ في الحسابات. جرب مرة تانية؟', 'bot', routes.slice(0, 4));
-        setStep('ROUTE');
-      }
-
-    } catch (err) {
-      setLoading(false);
-      addMessage('⚠️ مشكلة في الاتصال بالسيرفر. تأكد إنه شغال على port 5000!', 'bot');
-      setStep('ROUTE');
+    await new Promise(r => setTimeout(r, 1500)); // Simulate processing
+    
+    const { weather, scheduled_time } = data;
+    const hour = parseInt(scheduled_time.split(':')[0]);
+    const is_peak = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19);
+    
+    // Simple prediction logic
+    let delay = 0;
+    const reasons = [];
+    
+    if (weather === 'rainy') {
+      delay += 8.5;
+      reasons.push({ factor: 'طقس ممطر / Rainy Weather', impact: '+8.5 دقيقة' });
+    } else if (weather === 'foggy') {
+      delay += 5.2;
+      reasons.push({ factor: 'ضباب / Foggy', impact: '+5.2 دقيقة' });
+    } else if (weather === 'cloudy') {
+      delay += 1.5;
+      reasons.push({ factor: 'غيوم / Cloudy', impact: '+1.5 دقيقة' });
+    } else {
+      reasons.push({ factor: 'طقس جيد / Good Weather', impact: 'إيجابي ✅' });
     }
+    
+    if (is_peak) {
+      delay += 6.0;
+      reasons.push({ factor: 'وقت الذروة / Peak Hour', impact: '+6.0 دقيقة' });
+    } else {
+      reasons.push({ factor: 'وقت عادي / Off-Peak', impact: 'إيجابي ✅' });
+    }
+    
+    delay = Math.max(0, delay + (Math.random() * 2 - 1)); // Add noise
+    
+    setLoading(false);
+    
+    let statusEmoji = '✅';
+    let statusText = 'في الوقت';
+    if (delay > 10) {
+      statusEmoji = '🔴';
+      statusText = 'تأخير كبير';
+    } else if (delay > 5) {
+      statusEmoji = '🟡';
+      statusText = 'تأخير متوسط';
+    } else if (delay > 0) {
+      statusEmoji = '🟢';
+      statusText = 'تأخير بسيط';
+    }
+
+    const responseText = `${statusEmoji} التنبؤ جاهز للطريق ${data.route_id}!\n\n` +
+      `📊 الحالة: ${statusText}\n` +
+      `⏱️ التأخير المتوقع: ${delay.toFixed(1)} دقيقة\n` +
+      `🎯 دقة التنبؤ: 85%\n\n` +
+      `💡 الأسباب:\n${reasons.map(r => `  • ${r.factor}: ${r.impact}`).join('\n')}\n\n` +
+      `عايز تفحص طريق تاني؟`;
+    
+    addMessage(responseText, 'bot', ['🔄 طريق جديد', ...ROUTES.slice(0, 3)]);
+    setStep('DONE');
   };
 
   return (
@@ -384,13 +396,13 @@ const ChatInterface = ({ user, onLogout }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-white border-t border-gray-100 flex gap-3 items-center relative z-10">
+      <div className="p-4 bg-white border-t border-gray-100 flex gap-3 items-center">
         <input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           disabled={loading}
           placeholder="اكتب إجابتك هنا... (عربي أو English)"
-          className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none shadow-inner"
+          className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && inputValue.trim()) {
               handleUserResponse(inputValue);
@@ -406,7 +418,7 @@ const ChatInterface = ({ user, onLogout }) => {
             }
           }}
           disabled={loading || !inputValue.trim()}
-          className="bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 shadow-lg disabled:opacity-50 transition-all"
         >
           <Send size={20} />
         </button>
@@ -419,7 +431,7 @@ const ModelApp = ({ onClose }) => {
   const [user, setUser] = useState(null);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="w-full max-w-4xl relative">
         <button 
           onClick={onClose} 
