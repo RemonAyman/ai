@@ -416,6 +416,7 @@ const ChatInterface = ({ user, onLogout }) => {
               handleUserResponse(inputValue);
               setInputValue('');
             }
+            
           }}
           disabled={loading || !inputValue.trim()}
           className="bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 shadow-lg disabled:opacity-50 transition-all"
