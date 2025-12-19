@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, BarChart3, Brain, AlertCircle, CheckCircle, TrendingUp, Download, FileWarning, Eye, FileText, Database, PieChart, PlayCircle, Calculator } from 'lucide-react';
+import ModelApp from './model/ModelApp';
 
 
 const TransportDelayPredictor = () => {
@@ -12,6 +13,7 @@ const TransportDelayPredictor = () => {
   const [outlierStats, setOutlierStats] = useState(null);
   const [error, setError] = useState(null);
   const [showDataPreview, setShowDataPreview] = useState(false);
+  const [showModelApp, setShowModelApp] = useState(false);
   const [outlierMethod, setOutlierMethod] = useState('iqr'); // 'iqr' or 'zscore'
   const [predictionInput, setPredictionInput] = useState({
     route_id: 'R1',
@@ -985,6 +987,9 @@ Best Model: XGBoost (R² = 0.81)
             <span className="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm">
               📉 Interactive Charts
             </span>
+            <button onClick={() => setShowModelApp(true)} className="px-3 py-1 bg-indigo-600 text-white rounded-full text-sm hover:bg-indigo-700">
+              🤖 Open Model Playground
+            </button>
           </div>
         </div>
 
@@ -1939,6 +1944,10 @@ Best Model: XGBoost (R² = 0.81)
             </div>
           )}
         </div>
+
+        {showModelApp && (
+          <ModelApp onClose={() => setShowModelApp(false)} />
+        )}
 
         {/* Footer */}
         <div className="mt-6 text-center text-gray-600 text-sm">
